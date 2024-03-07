@@ -4,20 +4,20 @@ import (
 	"container/list"
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
 )
 
-// LRU Cache implementation
+// CacheItem represents an item stored in the cache
 type CacheItem struct {
 	Key   string
 	Value string
-	Exp   time.Time
+	Exp   time.Time // Expiration time for the cache item
 }
 
+// LRUCache represents the LRU cache
 type LRUCache struct {
 	capacity int
 	items    map[string]*list.Element
@@ -27,6 +27,7 @@ type LRUCache struct {
 
 var cache *LRUCache // Declare cache as a global variable
 
+// NewLRUCache creates a new LRUCache with the given capacity
 func NewLRUCache(capacity int) *LRUCache {
 	return &LRUCache{
 		capacity: capacity,
@@ -35,6 +36,7 @@ func NewLRUCache(capacity int) *LRUCache {
 	}
 }
 
+// Get retrieves the value associated with the key from the cache
 func (c *LRUCache) Get(key string) (string, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -51,6 +53,7 @@ func (c *LRUCache) Get(key string) (string, bool) {
 	return "", false
 }
 
+// Set adds or updates a value in the cache with the specified expiration time
 func (c *LRUCache) Set(key string, value string, exp time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -69,6 +72,7 @@ func (c *LRUCache) Set(key string, value string, exp time.Duration) {
 	}
 }
 
+// removeOldest removes the oldest item from the cache
 func (c *LRUCache) removeOldest() {
 	ele := c.ll.Back()
 	if ele != nil {
@@ -76,57 +80,53 @@ func (c *LRUCache) removeOldest() {
 	}
 }
 
+// removeElement removes the specified element from the cache
 func (c *LRUCache) removeElement(ele *list.Element) {
 	c.ll.Remove(ele)
 	item := ele.Value.(*CacheItem)
 	delete(c.items, item.Key)
 }
 
+// handleSet handles the HTTP POST request to set a value in the cache
 func handleSet(w http.ResponseWriter, r *http.Request) {
-	// Parse the key, value, and expiration from the request
-	// This is a simplified example; you might want to use a more robust method for parsing
-	key := r.URL.Query().Get("key")
-	value := r.URL.Query().Get("value")
-	expStr := r.URL.Query().Get("exp")
-	exp, err := strconv.Atoi(expStr)
+	type SetRequest struct {
+		Key   string `json:"key"`
+		Value string `json:"value"`
+		Exp   int    `json:"exp"`
+	}
+
+	var req SetRequest
+	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		http.Error(w, "Invalid expiration", http.StatusBadRequest)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	// Call the Set method on the cache
-	cache.Set(key, value, time.Duration(exp)*time.Second)
+	expiration := time.Duration(req.Exp) * time.Second
+	cache.Set(req.Key, req.Value, expiration)
 
-	// Send a success response
 	w.WriteHeader(http.StatusOK)
 }
 
+// handleGet handles the HTTP GET request to retrieve a value from the cache
 func handleGet(w http.ResponseWriter, r *http.Request) {
-	// Parse the key from the request
 	key := r.URL.Query().Get("key")
 
-	// Call the Get method on the cache
 	value, ok := cache.Get(key)
 	if !ok {
 		http.Error(w, "Key not found", http.StatusNotFound)
 		return
 	}
 
-	// Send the value in the response
 	json.NewEncoder(w).Encode(map[string]string{"value": value})
 }
 
-
-
 func main() {
-	// Instantiate the LRU cache with a capacity of 1024
 	cache = NewLRUCache(1024)
 
-	// Set up the HTTP server
 	r := mux.NewRouter()
 	r.HandleFunc("/set", handleSet).Methods("POST")
 	r.HandleFunc("/get", handleGet).Methods("GET")
 
-	// Start the server
 	http.ListenAndServe(":8080", r)
 }
