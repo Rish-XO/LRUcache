@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/rs/cors"
 )
 
 // CacheItem represents an item stored in the cache
@@ -128,5 +129,8 @@ func main() {
 	r.HandleFunc("/set", handleSet).Methods("POST")
 	r.HandleFunc("/get", handleGet).Methods("GET")
 
-	http.ListenAndServe(":8080", r)
+    //cors middleware
+	c := cors.Default().Handler(r)
+
+	http.ListenAndServe(":8080", c)
 }
