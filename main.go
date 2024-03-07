@@ -3,7 +3,6 @@ package main
 import (
 	"container/list"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 	"sync"
@@ -25,6 +24,8 @@ type LRUCache struct {
 	ll       *list.List
 	mu       sync.Mutex
 }
+
+var cache *LRUCache // Declare cache as a global variable
 
 func NewLRUCache(capacity int) *LRUCache {
 	return &LRUCache{
@@ -118,5 +119,14 @@ func handleGet(w http.ResponseWriter, r *http.Request) {
 
 
 func main() {
+	// Instantiate the LRU cache with a capacity of 1024
+	cache := NewLRUCache(1024)
 
+	// Set up the HTTP server
+	r := mux.NewRouter()
+	r.HandleFunc("/set", handleSet).Methods("POST")
+	r.HandleFunc("/get", handleGet).Methods("GET")
+
+	// Start the server
+	http.ListenAndServe(":8080", r)
 }
