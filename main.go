@@ -120,7 +120,7 @@ func handleGet(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	// Instantiate the LRU cache with a capacity of 1024
-	cache := NewLRUCache(1024)
+	cache = NewLRUCache(1024)
 
 	// Set up the HTTP server
 	r := mux.NewRouter()
