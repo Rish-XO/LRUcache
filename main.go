@@ -2,11 +2,14 @@ package main
 
 import (
 	"container/list"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"strconv"
 	"sync"
 	"time"
-	"encoding/json"
-	"net/http"
+
+	"github.com/gorilla/mux"
 )
 
 // LRU Cache implementation
@@ -78,35 +81,42 @@ func (c *LRUCache) removeElement(ele *list.Element) {
 	delete(c.items, item.Key)
 }
 
+func handleSet(w http.ResponseWriter, r *http.Request) {
+	// Parse the key, value, and expiration from the request
+	// This is a simplified example; you might want to use a more robust method for parsing
+	key := r.URL.Query().Get("key")
+	value := r.URL.Query().Get("value")
+	expStr := r.URL.Query().Get("exp")
+	exp, err := strconv.Atoi(expStr)
+	if err != nil {
+		http.Error(w, "Invalid expiration", http.StatusBadRequest)
+		return
+	}
+
+	// Call the Set method on the cache
+	cache.Set(key, value, time.Duration(exp)*time.Second)
+
+	// Send a success response
+	w.WriteHeader(http.StatusOK)
+}
+
+func handleGet(w http.ResponseWriter, r *http.Request) {
+	// Parse the key from the request
+	key := r.URL.Query().Get("key")
+
+	// Call the Get method on the cache
+	value, ok := cache.Get(key)
+	if !ok {
+		http.Error(w, "Key not found", http.StatusNotFound)
+		return
+	}
+
+	// Send the value in the response
+	json.NewEncoder(w).Encode(map[string]string{"value": value})
+}
 
 
-// Test code
+
 func main() {
-	// Instantiate the LRU cache with a capacity of 3
-	cache := NewLRUCache(3)
 
-	// Set key-value pairs with different expiration times
-	cache.Set("key1", "value1", 5*time.Second)
-	cache.Set("key2", "value2", 10*time.Second)
-	cache.Set("key3", "value3", 15*time.Second)
-
-	// Attempt to get a value
-	value, ok := cache.Get("key1")
-	fmt.Printf("Get key1: %s, ok: %v\n", value, ok)
-
-	// Wait for a while to let some items expire
-	time.Sleep(10 * time.Second)
-
-	// Attempt to get a value that should have expired
-	value, ok = cache.Get("key1")
-	fmt.Printf("Get key1 after expiration: %s, ok: %v\n", value, ok)
-
-	// Set a new item to test eviction
-	cache.Set("key4", "value4", 20*time.Second)
-
-	// Attempt to get the new item and an old item
-	value, ok = cache.Get("key4")
-	fmt.Printf("Get key4: %s, ok: %v\n", value, ok)
-	value, ok = cache.Get("key2")
-	fmt.Printf("Get key2: %s, ok: %v\n", value, ok)
 }
